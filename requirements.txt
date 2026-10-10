@@ -1,0 +1,5 @@
+pyserial
+numpy
+scipy
+matplotlib
+pygame
