@@ -6,6 +6,7 @@
 
 unsigned long nextSample = 0;
 
+
 void setup() {
   Serial.begin(BAUD_RATE);
   nextSample = micros();

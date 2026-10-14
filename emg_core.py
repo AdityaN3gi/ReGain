@@ -41,6 +41,8 @@ class EMGSource:
         self.error = None
         self._running = False
         self._thread = None
+        self._raw_lock = threading.Lock()
+        self._raw_buf = []
 
     # ---------- connection ----------
     @staticmethod
@@ -73,6 +75,13 @@ class EMGSource:
             if time.time() - t0 > timeout:
                 raise RuntimeError("No data from the board. Check the port, and close the Arduino Serial Monitor / live_plot.py.")
             time.sleep(0.05)
+
+    def drain_raw(self):
+        """Drain and return all accumulated raw ADC samples since last call."""
+        with self._raw_lock:
+            samples = self._raw_buf
+            self._raw_buf = []
+        return samples
 
     # ---------- background thread: read -> filter -> envelope ----------
     def _run(self):
@@ -107,6 +116,13 @@ class EMGSource:
                         pass
                 if not vals:
                     continue
+
+                # Buffer raw samples for fatigue analysis
+                with self._raw_lock:
+                    self._raw_buf.extend(vals)
+                    if len(self._raw_buf) > FS * 10:  # avoid unbounded memory growth
+                        del self._raw_buf[:-FS * 10]
+
                 x = np.array(vals, dtype=float) - 512.0
                 x, nz = signal.lfilter(nb, na, x, zi=nz)
                 x, hp_z = signal.sosfilt(hp, x, zi=hp_z)
@@ -174,6 +190,7 @@ class FakeEMG:
     def start(self): pass
     def stop(self): pass
     def wait_ready(self, timeout=15): pass
+    def drain_raw(self): return []
     def load_calibration(self, path=CAL_FILE): return True
 
     @property
